@@ -120,24 +120,82 @@ def monthToDateExpenses(user_id,conn):#calculates total expenses for month, RETU
     cursor.execute(query, (user_id, first_day_str, today_str))
     
     result = cursor.fetchone()
+    cursor.close()
     return result[0] if result else 0
-def filter_by_date_range():#Not yet implemented
+def filter_by_month(user_id,conn):
     # Filter expenses by date range
     try:
-        start_date_str = input("Enter the start date (YYYY-MM-DD): ")
-        end_date_str = input("Enter the end date (YYYY-MM-DD): ")
+        cursor=conn.cursor()
+        start_date_str = input("Enter month and year to look up expenses: YYYY-MM\n")
+        year, month = map(int, start_date_str.split('-'))
+        datepattern=f"{start_date_str}%"
+        cursor.execute("SELECT date, category, price, description, id FROM expenses WHERE user_id = ? AND date LIKE ?", (user_id,datepattern))
+        expenses=cursor.fetchall()
+        total_amount = 0
 
-        start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
-        end_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        if expenses:
+            month_name = datetime(year, month, 1).strftime("%B")
+            print(f"Expenses for the month of {month_name}, {year}:")
+            for expense in expenses:
+                date, category, price, description, id = expense
+                print(f"Expense ID: {id} Date: {date}, Category: {category}, Amount: ${price:.2f}, Description: {description},")
+                total_amount+=price
+            print(f"Total amount spent for the month: ${total_amount}")
+        else:
+            print("No expenses found for the specified month.")
 
-        print(f"Expenses between {start_date} and {end_date}:")
-        for category, category_expenses in expenses.items():
-            for date, amount, description in category_expenses:
-                if start_date <= date <= end_date:
-                    print(f"Date: {date}, Category: {category}, Amount: ${amount:.2f}, Description: {description}")
+        cursor.close()
+       
+    except ValueError:
+        print("Invalid date format. Please use the YYYY-MM format for dates.")
+def add_split_expense(user_id, conn):
+    try:
+        total_amount = float(input("Enter the total amount of the expense: "))
+        num_people = int(input("Enter the number of people to split the expense with: "))
+
+        split_details = {}
+        for i in range(num_people):
+            person_name = input(f"Enter the name for person {i+1}: ")
+            amount = float(input(f"Enter the amount person {i+1} owes: "))
+            split_details[person_name] = amount
+
+        # Add the main expense
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO expenses (user_id, price, isSharedExpense) VALUES (?, ?, ?)", (user_id, total_amount, 1))
+        expense_id = cursor.lastrowid  # Get the ID of the newly added expense
+
+        # Add split details
+        for person_name, amount in split_details.items():
+            cursor.execute("INSERT INTO split_expenses (expense_id, owed_by_person, amount, is_paid) VALUES (?, ?, ?, ?)", (expense_id, person_name, amount, 0))
+
+        conn.commit()
+        print("Split expense added successfully.")
 
     except ValueError:
-        print("Invalid date format. Please use the YYYY-MM-DD format for dates.")
+        print("Invalid input. Please enter valid numeric values.")
+
+def display_split_expenses(conn, expense_id):
+    cursor = conn.cursor()
+    cursor.execute("SELECT owed_by_person, amount, is_paid FROM split_expenses WHERE expense_id = ?", (expense_id,))
+    splits = cursor.fetchall()
+
+    if splits:
+        print("\nSplit Expense Details:")
+        for split in splits:
+            owed_by_person, amount, is_paid = split
+            status = "Paid" if is_paid else "Unpaid"
+            print(f"{owed_by_person} owes ${amount:.2f} - Status: {status}")
+    else:
+        print("No split details found for this expense.")
+def update_repayment_status(conn, expense_id, person_name):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE split_expenses SET is_paid = 1 WHERE expense_id = ? AND owed_by_person = ?", (expense_id, person_name))
+        conn.commit()
+        print("Repayment status updated successfully.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 def summarize_expenses():#Not yet implemented
     # Summarize expenses for a given time period
     print("\nExpense Summaries:")
@@ -202,3 +260,22 @@ def show_menu():#Not used
                 print("Invalid choice. Please select a valid option (1-7).")
         except ValueError:
             print("Invalid input. Please enter a valid number for your choice.")
+def create_budget():
+    while True:
+        try:
+          
+            budget_input = input("Please enter your budget for the month: ")
+
+           
+            budget = float(budget_input)
+
+           
+            if budget < 0:
+                print("Please enter a positive number.")
+                continue
+
+            return budget
+
+        except ValueError:
+            # Handle cases where the conversion to float fails (invalid input)
+            print("Invalid input. Please enter a numeric value.")

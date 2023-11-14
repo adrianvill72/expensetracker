@@ -25,19 +25,24 @@ def create_expenses_table():
     conn.commit()
     conn.close()
 
-
-
 def main():
     current_userID,usersFirstName=loginMenu()
     create_expenses_table()
     conn = conn = sqlite3.connect('user_data.db')
     cursor = conn.cursor()
     monthExpenses=monthToDateExpenses(current_userID,conn)
+    userbudget=0
     while True:
         print(f"\nWelcome {usersFirstName},")
         print("\nExpense Tracking System:")
         if(monthExpenses!=None):
-            print(f"This month you have spent a total of: ${monthExpenses} ")
+            print(f"This month you have spent a total of: ${monthExpenses}")
+            if(userbudget!=0):
+                print(f"Your budget of the month is set to: ${userbudget}")
+                if(monthExpenses>userbudget):
+                    print("!!!YOU ARE ABOVE YOUR BUDGET FOR THE MONTH!!!")
+                if(monthExpenses>(userbudget*.75)):
+                    print("You are nearing your set budget.")
         print("1. Record an Expense")
         print("2. List Expenses")
         print("3. Edit Expense")
@@ -53,7 +58,7 @@ def main():
             elif choice == 2:
                 print("\nExpense Viewer: ")
                 print("\n 1.) List all Expenses.")
-                print("\n 2.) View this months expenses.")
+                print("\n 2.) Expenses by Month/Year.")
                 print("\n 3.) View Expense by Category.")
 
                 choice2=(input("\nMake a selection:"))
@@ -63,7 +68,8 @@ def main():
                         list_all_expenses(current_userID,conn)
                         
                     case "2":
-                        return 
+                        filter_by_month(current_userID,conn)
+                        input("Press Enter to continue...")
                     case "3":
                         filter_by_category(current_userID,conn)
                         
@@ -72,9 +78,9 @@ def main():
             elif choice == 4:
                 summarize_expenses()
             elif choice == 5:
-                shared_expense_tracking()
+                add_split_expense(current_userID,conn)
             elif choice == 6:
-                create_budget()  # New option to create a budget
+                userbudget=create_budget()  # New option to create a budget
             elif choice == 7:
                 print("Exiting the Expense Tracking System. Goodbye!")
                 break
@@ -83,6 +89,5 @@ def main():
         except ValueError:
             print("Invalid input. Please enter a valid number for your choice.")
 
-    
 if __name__ == "__main__":
     main()
